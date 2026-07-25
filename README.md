@@ -1,24 +1,56 @@
-# Minetest
+# Luanti
 
-Minetest is a free and open-source game creation system with focus on voxel graphics. It is written primarily in C++ and makes use of the Irrlicht Engine. Minetest provides an API for users to write their own games and mods written in Lua. It is cross-platform, being available for Microsoft Windows, macOS, Linux, some BSD descendants, some GNU variants and Android.
+Luanti (formerly Minetest) is a free and open-source voxel game engine with its own distribution platform and client. Players, creators, server hosts, and engine developers can find more information here about how to get started with Luanti.
 
-wikipedia.org/wiki/Minetest
+wikipedia.org/wiki/Luanti
 
-![minetest logo](https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Minetest_logo.svg/512px-Minetest_logo.svg.png)
+<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Minetest_logo.svg/250px-Minetest_logo.svg.png" width="30%" height="auto" alt="Luanti logo">
 
 ## How to use this Makejail
 
 ### Standalone
 
-```sh
-appjail makejail \
-    -j minetest \
-    -f gh+AppJail-makejails/minetest \
-    -o virtualnet=":<random> default" \
-    -o nat
-```
+Before starting the container:
 
-### Deploy using appjail-director
+* (optional) download a configuration file:
+
+  ```console
+  $ fetch -o minetest.conf https://github.com/luanti-org/luanti/blob/master/minetest.conf.example?raw=true
+  ```
+
+* create the necessary directories:
+
+  ```console
+  $ mkdir -p games mods data/.minetest/games data/.minetest/mods
+  ```
+
+* install the game you want to play in `./games/`. Follow [this guide](https://content.luanti.org/help/installing/#installing-using-the-command-line). For example, to install `voxelibre` using `git`
+
+  ```console
+  $ git clone https://git.minetest.land/VoxeLibre/VoxeLibre ./games/voxelibre/
+  ```
+
+* start the container
+
+  ```console
+  $ appjail oci run -Pd \
+      -e PUID=15000 \ # arbitrary
+      -e PGID=15000 \ # arbitrary
+      -o overwrite=force \
+      -o virtualnet=":<random> default" \
+      -o nat \
+      -o fstab="$PWD/minetest.conf usr/local/etc/minetest.conf nullfs ro" \
+      -o fstab="$PWD/data /var/db/minetest" \
+      -o fstab="$PWD/games /var/db/minetest/.minetest/games nullfs ro" \
+      -o fstab="$PWD/mods /var/db/minetest/.minetest/mods nullfs ro" \
+      -o expose="30000 proto:udp" \
+      ghcr.io/appjail-makejails/luanti luanti \
+      --config /usr/local/etc/minetest.conf --gameid voxelibre --worldname world
+  ```
+
+`./data/.minetest/` has the directory `worlds/`, where the world will be saved.
+
+### Deploy using `appjail-director`
 
 **appjail-director.yml**:
 
@@ -26,193 +58,67 @@ appjail makejail \
 options:
   - virtualnet: ':<random> default'
   - nat:
+  - container: 'boot args:--pull' 
 
 services:
-  minetest:
-    name: minetest
+  luanti:
+    name: luanti
     makejail: gh+AppJail-makejails/minetest
     volumes:
-      - data: minetest-data
-      - log: minetest-log
-
-default_volume_type: '<volumefs>'
-
-volumes:
-  data:
-    device: .volumes/data
-  log:
-    device: .volumes/log
-```
-
-**.env**:
-
-```
-DIRECTOR_PROJECT=minetest
-```
-
-### Customize
-
-If you want to customize your minetest instance, it's very simple. For example, let's add a new mod:
-
-1. Create the `mods/` directory:
-
-```sh
-mkdir -p .volumes/data/.minetest/mods
-```
-
-2. Download the mod (and its dependencies):
-
-```sh
-cd .volumes/data/.minetest/mods
-fetch -o animalia.zip https://content.minetest.net/packages/ElCeejo/animalia/releases/23715/download/
-fetch -o creature.zip https://content.minetest.net/packages/ElCeejo/creatura/releases/22754/download/
-```
-
-3. Unzip the mod (and its dependencies):
-
-```sh
-unzip animalia.zip
-unzip creature.zip
-```
-
-4. Remove the ZIP files:
-
-```sh
-rm *.zip
-```
-
-5. Fix the owner and group:
-
-```sh
-cd -
-chown -Rf 976:976 .volumes/data/.minetest/mods
-```
-
-6. Restart the `rc(8)` script:
-
-```sh
-appjail service jail minetest minetest restart
-```
-
-7. Change `load_mod_<mod> = false` to `load_mod_<mod> = true` for each mod you want to enable:
-
-```sh
-$EDITOR .volumes/data/world/world.mt
-```
-
-8. Restart the `rc(8)` script again:
-
-```sh
-appjail service jail minetest minetest restart
-```
-
-**Recommendation**: Visit the wiki for more details: https://wiki.minetest.net
-
-### Configuration
-
-To preserve the configuration settings we have made in our `minetest.conf` configuration file, we must copy it for each jail recreation. Here the step by step:
-
-1. Create the `files/usr/local/etc` directory:
-
-```sh
-mkdir -p files/usr/local/etc
-```
-
-2. Copy the `minetest.conf` configuration file from the jail to the host:
-
-```sh
-appjail cmd local minetest \
-    cp -a usr/local/etc/minetest.conf $PWD/files/usr/local/etc/minetest.conf
-```
-
-3. (optional): Edit the configuration file:
-
-```sh
-$EDITOR files/usr/local/etc/minetest.conf
-```
-
-4. Edit the Director file:
-
-```yaml
-options:
-  - virtualnet: ':<random> default'
-  - nat:
-  - copydir: !ENV '${PWD}/files'
-
-services:
-  minetest:
-    name: minetest
-    makejail: gh+AppJail-makejails/minetest
+      - config: usr/local/etc/minetest.conf
+      - data: /var/db/minetest
+      - games: /var/db/minetest/.minetest/games
+      - mods: /var/db/minetest/.minetest/mods
+    oci:
+      environment:
+        - PUID: 15000
+        - PGID: 15000
+      arguments: ["--config", "/usr/local/etc/minetest.conf", "--gameid", "voxelibre", "--worldname", "world"]
     options:
-      - file: /usr/local/etc/minetest.conf
-    volumes:
-      - data: minetest-data
-      - log: minetest-log
+      - expose: '30000 proto:udp'
 
-default_volume_type: '<volumefs>'
+default_volume_type: nullfs
 
 volumes:
+  config:
+    device: !ENV '${PWD}/minetest.conf'
   data:
-    device: .volumes/data
-  log:
-    device: .volumes/log
+    device: !ENV '${PWD}/data'
+  games:
+    device: !ENV '${PWD}/games'
+    options: ro
+  mods:
+    device: !ENV '${PWD}/mods'
+    options: ro
 ```
 
-5. Recreate the project:
+### Arguments (stage: build)
 
-```
-appjail-director up
-```
+* `luanti_from` (default: `ghcr.io/appjail-makejails/luanti`): Location of OCI image. See also [OCI Configuration](#oci-configuration).
+* `luanti_tag` (default: `latest`): OCI image tag. See also [OCI Configuration](#oci-configuration).
 
-### Arguments
+### Environment (OCI image)
 
-* `minetest_tag` (default: `14.3`): See [#tags](#tags).
-* `minetest_ajspec` (default: `gh+AppJail-makejails/minetest`): Entry point where the `appjail-ajspec(5)` file is located.
+* `PGID` (default: `1000`): Equivalent to `PUID` but for the Process Group ID.
+* `PUID` (default: `1000`): Process User ID for the container's main process, allowing you to match the owner of files written to mounted host volumes to your host system's user. Writable volumes are changed based on this environment variable.
 
 ### Volumes
 
-| Name          | Owner | Group | Perm | Type | Mountpoint        |
-| ------------- | ----- | ----- | ---- | ---- | ----------------- |
-| minetest-data | 976   | 976   |  -   |  -   | /var/db/minetest  |
-| minetest-log  | 976   | 976   |  -   |  -   | /var/log/minetest |
+| Name | Owner | Group | Perm | Type | Mountpoint |
+| --- | --- | --- | --- | --- | --- |
+| appjail-1e8ed96e87-var_db_minetest | `${PUID}` | `${PGID}` | - | - | /var/db/minetest |
 
-## Screenshots
+## OCI Configuration
 
-<p align="center">
-<img src="https://i.ibb.co/7VRGYmg/screenshot-20240522-203554.png">
-</p>
-
-<p align="center">
-<img src="https://i.ibb.co/xHGWNKF/screenshot-20240522-213304.png">
-</p>
-
-<p align="center">
-<img src="https://i.ibb.co/hVqKxSg/screenshot-20240523-072600.png">
-</p>
-
-<p align="center">
-<img src="https://i.ibb.co/6Z3Ncdp/screenshot-20240523-072642.png">
-</p>
-
-<p align="center">
-<img src="https://i.ibb.co/hYSzBjv/screenshot-20240523-203931.png">
-</p>
-
-<p align="center">
-<img src="https://i.ibb.co/wJswrMp/screenshot-20240523-204051.png">
-</p>
-
-<p align="center">
-<img src="https://i.ibb.co/Ny7KHXp/screenshot-20240523-204058.png">
-</p>
-
-<p align="center">
-<img src="https://i.ibb.co/xLPHY3W/screenshot-20240523-204102.png">
-</p>
-
-## Tags
-
-| Tag    | Arch    | Version        | Type   |
-| ------ | ------- | -------------- | ------ |
-| `14.3` | `amd64` | `14.3-RELEASE` | `thin` |
-| `15` | `amd64` | `15` | `thin` |
+```yaml
+build:
+  variants:
+    - tag: 15.1
+      containerfile: Containerfile
+      aliases: ["latest"]
+      default: true
+      args:
+        FREEBSD_RELEASE: "15.1"
+        NO_PKGCLEAN: "1"
+      cache_dirs: ["pkgcache0:/var/cache/pkg"]
+```

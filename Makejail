@@ -1,10 +1,5 @@
-INCLUDE options/options.makejail
+ARG luanti_from=ghcr.io/appjail-makejails/luanti
+ARG luanti_tag=latest
 
-ARG minetest_tag=14.3
-ARG minetest_ajspec=gh+AppJail-makejails/minetest
-
-FROM --entrypoint "${minetest_ajspec}" minetest:${minetest_tag}
-
-SYSRC minetest_enable=YES
-SYSRC "minetest_args=--logfile /var/log/minetest/debug.log --world /var/db/minetest/world --gameid minetest_game"
-SERVICE minetest start
+OPTION overwrite=force
+OPTION from=${luanti_from}:${luanti_tag}
