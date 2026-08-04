@@ -1,5 +1,6 @@
 ARG luanti_from=ghcr.io/appjail-makejails/luanti
 ARG luanti_tag=latest
 
+OPTION container=boot
 OPTION overwrite=force
 OPTION from=${luanti_from}:${luanti_tag}

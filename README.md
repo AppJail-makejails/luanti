@@ -58,7 +58,7 @@ Before starting the container:
 options:
   - virtualnet: ':<random> default'
   - nat:
-  - container: 'boot args:--pull' 
+  - container: 'args:--pull' 
 
 services:
   luanti:
