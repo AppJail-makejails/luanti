@@ -14,7 +14,7 @@ LABEL org.opencontainers.image.title="Luanti" \
 RUN set -xe; \
     \
     pkg update; \
-    pkg install -U luanti; \
+    pkg install luanti; \
     \
     if [ -z "${NO_PKGCLEAN}" ]; then \
         pkg clean -a; \
